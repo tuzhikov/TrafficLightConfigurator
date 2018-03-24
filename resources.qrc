@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/">
+        <file>config/default.ini</file>
+        <file>ico/traffic.ico</file>
+        <file>ico/tools.ico</file>
+        <file>ico/running.ico</file>
+        <file>TS/language_ru.qm</file>
+    </qresource>
+</RCC>

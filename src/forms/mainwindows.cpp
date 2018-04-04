@@ -72,7 +72,7 @@ void MainWindow::upDataToGui()
     ptr_controller->getDataProtocol(mode_slave,direct);
     bool checked = (mode_slave)?true:false;
     ui->rb_mode_slave->setChecked(checked);
-    ui->cbDirect->setCurrentIndex(direct);
+    ui->cbDirect->setCurrentIndex(direct-1);
 }
 /**
  * @brief MainWindow::writeSetting
@@ -80,7 +80,7 @@ void MainWindow::upDataToGui()
 void MainWindow::writeSetting()
 {
     //Settings::set(Settings::GEOMETRY,Settings::GENERAL) = saveGeometry();
-    Settings::set(Settings::GEOMETRY) = saveGeometry();
+    //Settings::set(Settings::GEOMETRY) = saveGeometry();
     Settings::set(Settings::COMNAME,Settings::COMPORT) = setting_port->getComName();
     Settings::set(Settings::BAUDRATE,Settings::COMPORT) = setting_port->getBaudRate();
     Settings::set(Settings::DATABITS,Settings::COMPORT) = setting_port->getDataBits();
@@ -98,8 +98,8 @@ void MainWindow::readSetting()
     file.open(QIODevice::ReadOnly);
     Settings::setDefaults(file.readAll());
     // read
-    const QByteArray gemData = Settings::get(Settings::GEOMETRY).toByteArray();
-    restoreGeometry(gemData);
+    //const QByteArray gemData = Settings::get(Settings::GEOMETRY).toByteArray();
+    //restoreGeometry(gemData);
     // COM PORT
     const QString comname = Settings::get(Settings::COMNAME,Settings::COMPORT).toString();
     if (!comname.isEmpty())

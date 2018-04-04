@@ -2,47 +2,70 @@
 #include "controller.h"
 #include "crc.h"
 
+#define TEST_DEBUG 0
+//#define DEBUG_ANSWER
+
 void controller::commandWriteAll()
 {
-    const size_t lengh(sizeof(DataGui));
     QByteArray cmd;
     cmd.append((const char*)kHeaderProtocol,sizeof(kHeaderProtocol));
-    cmd.append((uint8_t)3+(uint8_t)lengh);// lengh DataGui +crc +cmd
+    cmd.append((char)7);// lengh DataGui +crc +cmd
     cmd.append((char)0);
     cmd.append(TYPE_TL);    // type
     cmd.append(CMD_TR_WRITE);   // cmd
     cmd.append(CMD_DATA);       // type cmd
-    cmd.append((const char*)&DataGui,lengh); //data
+    cmd.append((char*)&DataGui,sizeof(DataGui)); //data
     quint16 crc16 = CRC::Bit16( cmd );
-    cmd.append((char*)&crc16,sizeof(crc16));
+    cmd.append((char*)&crc16,sizeof(quint16));
+
+#if (TEST_DEBUG == 1)
+    const quint16 CRC = CRC::Bit16( cmd );
+    qDebug()<<"Output CRC:"<<CRC;
+#endif
 
     if (currentInterface->open())
     {
         timer_delay_read->setInterval(currentInterface->retTimeDelay());
         currentInterface->sendDate(cmd);
         timer_delay_read->start();
+        qDebug()<<"command set data: " <<cmd;
     }
-    qDebug()<<"command set data: " <<cmd;
+    else
+    {
+        qDebug()<<"Error opening port.";
+    }
 }
 
 void controller::commandReadAll()
 {
     QByteArray cmd;
     cmd.append((const char*)kHeaderProtocol,sizeof(kHeaderProtocol));
-    cmd.append((uint8_t)3);     // lengh low
+    cmd.append((char)7);     // lengh low
     cmd.append((char)0);        // lengh hi
     cmd.append(TYPE_TL);        // type
     cmd.append(CMD_TR_READ);    // cmd
     cmd.append(CMD_DATA);       // type cmd
+    cmd.append((char)0);        // null byte
+    cmd.append((char)0);        // null byte
     quint16 crc16 = CRC::Bit16( cmd );
     cmd.append((char*)&crc16,sizeof(crc16));
+
+#if (TEST_DEBUG == 1)
+    const quint16 CRC = CRC::Bit16( cmd );
+    qDebug()<<"Output CRC:"<<CRC;
+#endif
+
     if (currentInterface->open())
     {
         timer_delay_read->setInterval(currentInterface->retTimeDelay());
         currentInterface->sendDate(cmd);
         timer_delay_read->start();
+        qDebug()<<"command get data"<<cmd;
     }
-    qDebug()<<"command get data"<<cmd;
+    else
+    {
+        qDebug()<<"Error opening port.";
+    }
 }
 /**
  * @brief controller::parserReceivedPacket
@@ -52,6 +75,7 @@ RET_ANSWER controller::parserReceivedPacket(const QByteArray &cmd)
 {
     RET_ANSWER ret = NO_ANSWER;
     QByteArray readBuffer(cmd);
+
     const QByteArray HEAD((const char*)kHeaderProtocol,sizeof(kHeaderProtocol));
 
     const int index = readBuffer.indexOf(HEAD);
@@ -73,23 +97,28 @@ RET_ANSWER controller::checksumReceived(const QByteArray &cmd)
 
     if ( !CRC::Bit16(cmd) ) // CRC ok
     {
-        // [leng][leng][type][cmd][subcmd][answer][data]
+        // [leng][leng][type][cmd][subcmd][answer][data byte1]....[data byte n][crc16 low byte][crc16 hi byte]
         quint16 lengh_prefix(sizeof(kHeaderProtocol));
-        const TransportProtocolRead *pask((TransportProtocolRead*)(cmd.data()+lengh_prefix));
-        if ( ( pask->answer != 0xFF )
+        char *const data = (char *const)(cmd.data()+lengh_prefix);
+        const TransportProtocolRead *pask = reinterpret_cast<const TransportProtocolRead *>(data);
+
+        if (
+             ( pask->answer != 0xFF )
              &&(pask->subcmd < END_TYPE_NUMBER_COMMAND)
              &&(pask->cmd < END_TYPE_NUMBER_COMMAND_TRANSPORT)
-            )
+           )
         {
             const char *p_data = (const char *)&pask->data_start;
+            const quint16 lengh_data = pask->lengh - 6;
+
             if ( pask->cmd == CMD_TR_WRITE )
             {
 
-                result= (this->*data_write[pask->subcmd])(p_data,pask->lengh[0]);
+                result = (this->*data_write[pask->subcmd])(p_data,lengh_data);
             }
             else if ( pask->cmd == CMD_TR_READ )
             {
-                result= (this->*data_read[pask->subcmd])(p_data,pask->lengh[0]);
+                result = (this->*data_read[pask->subcmd])(p_data,lengh_data);
             }
         }
     }
@@ -134,19 +163,17 @@ void controller::setParametrs(const QStringList &list)
     qDebug()<<list;
 }
 
-//#define DEBUG_ANSWER
-
 #ifdef DEBUG_ANSWER
         QByteArray retTestMessage()
         {
             QByteArray cmd;
             cmd.append((const char*)kHeaderProtocol,sizeof(kHeaderProtocol));
-            cmd.append((uint8_t)2);     // lengh  datalow
+            cmd.append((char)8);        // lengh  datalow
             cmd.append((char)0);        // lengh hi
             cmd.append(TYPE_TL);        // type
             cmd.append(CMD_TR_READ);    // cmd
             cmd.append(CMD_DATA);       // type cmd
-            cmd.append((uint8_t)0x01);     // answer 0 - OK FF - error
+            cmd.append((char)0);        // answer 0 - OK FF - error
             cmd.append((uint8_t)1);     //
             cmd.append((uint8_t)7);     //
             quint16 crc16 = CRC::Bit16( cmd );
@@ -171,7 +198,10 @@ void controller::onTimerHandle()
 #ifdef DEBUG_ANSWER
     temp_buff.append(retTestMessage());
 #endif
+    qDebug()<<"Read buff: "<<temp_buff;
+
     const RET_ANSWER ret = parserReceivedPacket(temp_buff);
+
     if (ret == SUCCESSFULLY)
     {
         emit signalMessageOk(tr("<CENTER><b>Successfully command </CENTER></b>"));
@@ -184,7 +214,5 @@ void controller::onTimerHandle()
     {
         emit signalMessageError(tr("<CENTER><b> Data error </CENTER></b>"));
     }
-
-    qDebug()<<"Read buff: "<<temp_buff;
 }
 

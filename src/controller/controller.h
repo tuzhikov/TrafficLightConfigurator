@@ -23,14 +23,16 @@ enum TYPE_DEVICE{
     END_TYPE_DEVICE
 };
 
-struct TransportProtocolRead{
-    quint8 lengh[2];
+struct TransportProtocolRead
+{
+    quint16 lengh;
     quint8 type;
     quint8 cmd;
     quint8 subcmd;
     quint8 answer;
     quint8 data_start;
 };
+
 const quint8 kHeaderProtocol[] = { 0x55, 0xC3, 0x5A };
 
 class controller : public QObject

@@ -256,7 +256,7 @@ void SettingsDialog::openWindowsSetting()
 {
     show();
     fillPortsInfo();
-    updateSettings();
+    updateWidget();
 }
 /**
  * @brief SettingsDialog::fillPortsParameters
